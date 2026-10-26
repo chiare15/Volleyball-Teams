@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VolleyBalancer Pro - Gestione &amp; Storico Squadre Pallavolo</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            volley: {
+              navy: '#0f172a',
+              blue: '#1e40af',
+              lightBlue: '#3b82f6',
+              orange: '#f97316',
+              yellow: '#eab308',
+              emerald: '#10b981',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- HTML2PDF Library per export PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Navigation Bar -->
+  <header class="bg-slate-900/90 border-b border-slate-800 shadow-xl sticky top-0 z-40 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-yellow-400 flex items-center justify-center shadow-lg shadow-orange-500/20 text-slate-950 font-black text-xl">
+          <i class="fa-solid fa-volleyball"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            VolleyBalancer <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-2 py-0.5 rounded-full">Pro DB</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Gestione giocatori, storico partite e bilanciamento squadre</p>
+        </div>
+      </div>
+
+      <!-- Main Navigation Tabs -->
+      <nav class="flex items-center space-x-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+        <button id="nav-btn-generator" onclick="switchNavTab('generator')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 bg-orange-500 text-slate-950 shadow">
+          <i class="fa-solid fa-users-viewfinder"></i> Generatore
+        </button>
+        <button id="nav-btn-history" onclick="switchNavTab('history')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-clock-rotate-left"></i> Storico Partite (<span id="history-count-badge">0</span>)
+        </button>
+        <button id="nav-btn-backup" onclick="switchNavTab('backup')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-database"></i> Backup &amp; DB
+        </button>
+      </nav>
+
+      <!-- Quick actions -->
+      <div class="flex items-center space-x-2">
+        <button onclick="loadSampleData()" class="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-orange-400 border border-orange-500/30 rounded-lg transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span class="hidden md:inline">Dati Prova</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body Content -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- ==================== TAB 1: GENERATORE & GESTIONE GIOCATORI ==================== -->
+    <div id="nav-tab-content-generator" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Input and Players List (5 Cols) -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <!-- Input Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-user-plus text-orange-400"></i>
+              <span>1. Importazione &amp; Input Giocatori</span>
+            </h2>
+          </div>
+
+          <!-- Input Mode Tabs -->
+          <div class="flex space-x-1 bg-slate-950 p-1 rounded-xl mb-4 border border-slate-800">
+            <button id="input-btn-file" onclick="switchInputTab('file')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all bg-blue-600 text-white shadow">
+              <i class="fa-solid fa-file-arrow-up"></i> Carica TXT
+            </button>
+            <button id="input-btn-manual" onclick="switchInputTab('manual')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-400 hover:text-white">
+              <i class="fa-solid fa-file-lines"></i> Testo
+            </button>
+            <button id="input-btn-quick" onclick="switchInputTab('quick')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-400 hover:text-white">
+              <i class="fa-solid fa-plus"></i> Singolo
+            </button>
+          </div>
+
+          <!-- Tab Content: File TXT -->
+          <div id="input-content-file" class="space-y-3">
+            <label for="txt-file-input" class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-700 hover:border-orange-500 rounded-xl cursor-pointer bg-slate-950/50 hover:bg-slate-950 transition-all text-center p-3">
+              <i class="fa-solid fa-file-import text-2xl text-slate-400 mb-1"></i>
+              <span class="text-xs font-semibold text-slate-300">Trascina o clicca per caricare un file TXT/CSV</span>
+              <span class="text-[10px] text-slate-500 mt-0.5">Esempio: "Marco Rossi, 8", "Giulia - 7.5", "Luca 6"</span>
+              <input id="txt-file-input" type="file" accept=".txt,.csv" class="hidden" onchange="handleFileUpload(event)">
+            </label>
+          </div>
+
+          <!-- Tab Content: Manual Text Area -->
+          <div id="input-content-manual" class="space-y-3 hidden">
+            <textarea id="raw-text-input" rows="5" placeholder="Incolla elenco qui, un giocatore per riga...&#10;Mario, 8&#10;Giulia - 7.5&#10;Luca Avanzato&#10;Paolo 5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-orange-500 font-mono custom-scrollbar"></textarea>
+            <button onclick="parseRawText()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-all shadow flex items-center justify-center gap-2">
+              <i class="fa-solid fa-arrow-down-short-wide"></i> Estrai ed Aggiungi al Database
+            </button>
+          </div>
+
+          <!-- Tab Content: Quick Single -->
+          <div id="input-content-quick" class="space-y-3 hidden">
+            <div class="grid grid-cols-3 gap-2">
+              <input type="text" id="quick-name" placeholder="Nome cognome" class="col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+              <input type="number" id="quick-level" min="1" max="10" step="0.5" value="6" placeholder="Livello (1-10)" class="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-center text-amber-400 font-bold focus:outline-none focus:border-orange-500">
+            </div>
+            <button onclick="addSinglePlayer()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-all shadow flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-plus"></i> Salva nel Database
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Roster Management List -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col max-h-[550px]">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-users text-blue-400"></i>
+                <span>Database Giocatori (<span id="selected-count">0</span>)</span>
+              </h3>
+              <p class="text-[11px] text-slate-400" id="db-status-label">Stato DB: Inizializzazione...</p>
+            </div>
+            <div class="flex space-x-1">
+              <button onclick="toggleSelectAll(true)" class="text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">Tutti</button>
+              <button onclick="toggleSelectAll(false)" class="text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">Nessuno</button>
+              <button onclick="clearPlayerDatabase()" class="text-[10px] px-2 py-1 bg-red-950/50 hover:bg-red-900/60 text-red-300 border border-red-800/40 rounded">Svuota DB</button>
+            </div>
+          </div>
+
+          <!-- Controls: Search & Sort -->
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+              <input type="text" id="player-search" oninput="renderPlayersList()" placeholder="Cerca..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+            </div>
+            <select id="player-sort" onchange="renderPlayersList()" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+              <option value="name_asc">Nome (A - Z)</option>
+              <option value="level_desc" selected>Livello (Più forte)</option>
+              <option value="level_asc">Livello (Più debole)</option>
+            </select>
+          </div>
+
+          <!-- Dynamic Player List Container -->
+          <div id="players-list-container" class="flex-grow overflow-y-auto custom-scrollbar pr-1 space-y-2 min-h-[160px]">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Settings & Generated Output (7 Cols) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Balancing Controls -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <h2 class="text-base font-bold text-white flex items-center gap-2 mb-4 border-b border-slate-800 pb-3">
+            <i class="fa-solid fa-sliders text-yellow-400"></i>
+            <span>2. Configurazione Bilanciamento Partita</span>
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Modalità di Divisione</label>
+              <select id="split-mode" onchange="toggleSplitModeUI()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+                <option value="num_teams" selected>Numero di Squadre Totali</option>
+                <option value="team_size">Giocatori per Squadra (es. 6v6)</option>
+              </select>
+            </div>
+
+            <div id="num-teams-container">
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Numero di Squadre</label>
+              <select id="num-teams-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+                <option value="2" selected>2 Squadre</option>
+                <option value="3">3 Squadre</option>
+                <option value="4">4 Squadre</option>
+                <option value="5">5 Squadre</option>
+              </select>
+            </div>
+
+            <div id="team-size-container" class="hidden">
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Giocatori in Campo per Squadra</label>
+              <select id="team-size-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+                <option value="6" selected>6 Giocatori (Indoor Standard)</option>
+                <option value="4">4 Giocatori (4v4)</option>
+                <option value="3">3 Giocatori (3v3)</option>
+                <option value="2">2 Giocatori (Beach Volley 2v2)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Algoritmo di Bilanciamento</label>
+              <select id="algo-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+                <option value="snake" selected>Snake Draft (Equilibrato + Top Players)</option>
+                <option value="greedy">Greedy Optimization (Minimizza Gap Punti)</option>
+                <option value="random">Random con Vincoli Abilità</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Gestione Giocatori in Più</label>
+              <select id="bench-mode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500">
+                <option value="distribute" selected>Distribuisci nelle squadre</option>
+                <option value="bench">Metti in Panchina / Riserva</option>
+              </select>
+            </div>
+          </div>
+
+          <button onclick="generateTeams()" class="w-full py-3 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-orange-500/20 transform active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bolt-lightning"></i>
+            <span>GENERAZIONE SQUADRE EQUILIBRATE</span>
+          </button>
+        </div>
+
+        <!-- Output Cards Wrapper -->
+        <div id="output-wrapper" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl min-h-[320px]">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-trophy text-yellow-400"></i>
+                <span>3. Formazioni Generate</span>
+              </h2>
+              <p id="match-summary" class="text-xs text-slate-400 mt-0.5">Seleziona i giocatori e genera il match.</p>
+            </div>
+
+            <!-- Team Actions -->
+            <div id="export-actions" class="flex flex-wrap items-center gap-2 hidden">
+              <button onclick="saveCurrentMatchToHistory()" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-bookmark"></i>
+                <span>Salva in Storico</span>
+              </button>
+              <button onclick="copyTeamsToClipboard()" class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-copy"></i>
+                <span>WhatsApp</span>
+              </button>
+              <button onclick="exportToPDF()" class="px-3 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="teams-empty-state" class="flex flex-col items-center justify-center py-16 text-center text-slate-500">
+            <i class="fa-solid fa-volleyball text-4xl mb-3 text-slate-700"></i>
+            <p class="text-sm font-medium text-slate-400">Pronto per il fischio d'inizio!</p>
+            <p class="text-xs text-slate-600 max-w-xs mt-1">Carica ed esegui il calcolo per visualizzare le formazioni bilanciate.</p>
+          </div>
+
+          <!-- Dynamic Teams Grid -->
+          <div id="teams-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden"></div>
+
+          <!-- Bench Container -->
+          <div id="bench-cards-container" class="mt-4 pt-4 border-t border-slate-800 hidden">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-chair"></i> Riserve / Panchina (<span id="bench-count">0</span>)
+            </h4>
+            <div id="bench-list" class="flex flex-wrap gap-2"></div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 2: STORICO PARTITE SALVATE ==================== -->
+    <div id="nav-tab-content-history" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 mb-4 gap-2">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-orange-400"></i> Storico Partite &amp; Sessioni Salvate
+            </h2>
+            <p class="text-xs text-slate-400">Consulta, esporta o ripristina le squadre generate nelle sessioni precedenti.</p>
+          </div>
+          <button onclick="clearMatchHistory()" class="px-3 py-1.5 text-xs font-semibold bg-red-950/50 hover:bg-red-900/60 text-red-400 border border-red-800/40 rounded-lg transition-all self-start sm:self-auto flex items-center gap-1.5">
+            <i class="fa-solid fa-trash-can"></i> Svuota Storico
+          </button>
+        </div>
+
+        <div id="history-list-container" class="space-y-4">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: BACKUP & INTEGRITÀ DATABASE ==================== -->
+    <div id="nav-tab-content-backup" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Export Backup -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+            <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <i class="fa-solid fa-file-export text-lg"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Esporta Database (Backup JSON)</h3>
+              <p class="text-xs text-slate-400">Scarica un file completo di giocatori e storico partite.</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Esportando il database in formato <code class="text-orange-400 font-mono">.json</code> puoi conservare una copia di sicurezza di tutti i tuoi giocatori con i rispettivi livelli e lo storico di tutti i match creati.
+          </p>
+          <button onclick="exportDatabaseJSON()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-2">
+            <i class="fa-solid fa-download"></i> Scarica Backup (.JSON)
+          </button>
+        </div>
+
+        <!-- Import Backup -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <i class="fa-solid fa-file-import text-lg"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Importa Database (Restore JSON)</h3>
+              <p class="text-xs text-slate-400">Ripristina o unisci un file di backup salvato in precedenza.</p>
+            </div>
+          </div>
+          
+          <div>
+            <label for="json-file-input" class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl cursor-pointer bg-slate-950/50 hover:bg-slate-950 transition-all text-center p-3">
+              <i class="fa-solid fa-upload text-xl text-slate-400 mb-1"></i>
+              <span class="text-xs font-semibold text-slate-300">Seleziona file JSON di Backup</span>
+              <input id="json-file-input" type="file" accept=".json" class="hidden" onchange="importDatabaseJSON(event)">
+            </label>
+          </div>
+
+          <div class="flex items-center space-x-2 text-xs text-slate-400">
+            <input type="checkbox" id="import-merge-option" class="accent-orange-500 rounded">
+            <label for="import-merge-option" class="cursor-pointer">Unisci con i dati attuali (non sovrascrivere)</label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Edit Player Modal -->
+  <div id="edit-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-orange-400"></i> Modifica Giocatore nel DB
+        </h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <input type="hidden" id="edit-player-id">
+      
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1">Nome</label>
+        <input type="text" id="edit-player-name" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1">Livello Abilità (1.0 - 10.0)</label>
+        <div class="flex items-center space-x-3">
+          <input type="range" id="edit-player-level-range" min="1" max="10" step="0.5" oninput="syncModalLevelInput(this.value)" class="w-full accent-orange-500">
+          <input type="number" id="edit-player-level-num" min="1" max="10" step="0.5" oninput="syncModalLevelRange(this.value)" class="w-20 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-center text-sm text-amber-400 font-bold">
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+        <button onclick="closeEditModal()" class="px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all">Annulla</button>
+        <button onclick="savePlayerEdit()" class="px-4 py-2 text-xs font-bold bg-orange-500 hover:bg-orange-600 text-slate-950 rounded-xl transition-all shadow">Aggiorna DB</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-950 border-t border-slate-900 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <p>VolleyBalancer Pro &copy; 2026 - Database locale persistente in IndexedDB.</p>
+      <div class="flex items-center space-x-4">
+        <span class="flex items-center gap-1"><i class="fa-solid fa-database text-emerald-400"></i> Local Storage / IndexedDB</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Javascript Application Code -->
+  <script>
+    // ==========================================
+    // INDEXED DB / LOCAL STORAGE ENGINE
+    // ==========================================
+    const DB_NAME = "VolleyBalancerDB";
+    const DB_VERSION = 1;
+    let dbInstance = null;
+
+    // Fallback in-memory state
+    let state = {
+      players: [],
+      history: []
+    };
+
+    let currentGeneratedTeams = [];
+    let currentBench = [];
+
+    const TEAM_COLORS = [
+      { name: "Squadra Blu", border: "border-blue-500/60", bg: "bg-blue-950/30", header: "bg-blue-900/50", text: "text-blue-400", badge: "bg-blue-500/20 text-blue-300 border-blue-400/30" },
+      { name: "Squadra Arancione", border: "border-orange-500/60", bg: "bg-orange-950/30", header: "bg-orange-900/50", text: "text-orange-400", badge: "bg-orange-500/20 text-orange-300 border-orange-400/30" },
+      { name: "Squadra Verde", border: "border-emerald-500/60", bg: "bg-emerald-950/30", header: "bg-emerald-900/50", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30" },
+      { name: "Squadra Viola", border: "border-purple-500/60", bg: "bg-purple-950/30", header: "bg-purple-900/50", text: "text-purple-400", badge: "bg-purple-500/20 text-purple-300 border-purple-400/30" },
+      { name: "Squadra Gialla", border: "border-yellow-500/60", bg: "bg-yellow-950/30", header: "bg-yellow-900/50", text: "text-yellow-400", badge: "bg-yellow-500/20 text-yellow-300 border-yellow-400/30" }
+    ];
+
+    // Initialize Database on App Load
+    window.onload = function() {
+      initDatabase().then(() => {
+        loadDataFromStorage();
+      }).catch(err => {
+        console.warn("IndexedDB fallback on LocalStorage", err);
+        loadFromLocalStorageFallback();
+      });
+    };
+
+    function initDatabase() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          reject("IndexedDB not supported");
+          return;
+        }
+
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = function(e) {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("players")) {
+            db.createObjectStore("players", { keyPath: "id" });
+          }
+          if (!db.objectStoreNames.contains("history")) {
+            db.createObjectStore("history", { keyPath: "id" });
+          }
+        };
+
+        request.onsuccess = function(e) {
+          dbInstance = e.target.result;
+          updateDbStatusLabel("IndexedDB (Attivo)");
+          resolve(dbInstance);
+        };
+
+        request.onerror = function(e) {
+          reject(e);
+        };
+      });
+    }
+
+    // Storage Sync Actions
+    async function loadDataFromStorage() {
+      if (dbInstance) {
+        try {
+          const players = await getAllFromStore("players");
+          const history = await getAllFromStore("history");
+
+          state.players = players || [];
+          state.history = history || [];
+
+          if (state.players.length === 0) {
+            loadSampleData(false); // Silent load samples if fresh install
+          } else {
+            renderPlayersList();
+            renderHistoryList();
+          }
+        } catch (e) {
+          loadFromLocalStorageFallback();
+        }
+      } else {
+        loadFromLocalStorageFallback();
+      }
+    }
+
+    function saveStateToStorage() {
+      if (dbInstance) {
+        // Sync players store
+        clearStore("players").then(() => {
+          state.players.forEach(p => addToStore("players", p));
+        });
+        // Sync history store
+        clearStore("history").then(() => {
+          state.history.forEach(h => addToStore("history", h));
+        });
+      }
+      // Backup sync to localStorage
+      localStorage.setItem("volley_balancer_state", JSON.stringify(state));
+    }
+
+    function loadFromLocalStorageFallback() {
+      updateDbStatusLabel("LocalStorage (Fallback)");
+      const saved = localStorage.getItem("volley_balancer_state");
+      if (saved) {
+        try {
+          state = JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      if (!state.players || state.players.length === 0) {
+        loadSampleData(false);
+      } else {
+        renderPlayersList();
+        renderHistoryList();
+      }
+    }
+
+    function updateDbStatusLabel(statusText) {
+      document.getElementById("db-status-label").innerText = `DB: ${statusText}`;
+    }
+
+    // Helper functions for IndexedDB Promises
+    function getAllFromStore(storeName) {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction(storeName, "readonly");
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function addToStore(storeName, item) {
+      const tx = dbInstance.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      store.put(item);
+    }
+
+    function clearStore(storeName) {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    // ==========================================
+    // UI NAVIGATION TABS
+    // ==========================================
+    function switchNavTab(tabName) {
+      const tabs = ['generator', 'history', 'backup'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`nav-btn-${t}`);
+        const content = document.getElementById(`nav-tab-content-${t}`);
+        if (t === tabName) {
+          btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 bg-orange-500 text-slate-950 shadow font-bold";
+          content.classList.remove('hidden');
+        } else {
+          btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white";
+          content.classList.add('hidden');
+        }
+      });
+
+      if (tabName === 'history') {
+        renderHistoryList();
+      }
+    }
+
+    function switchInputTab(tabName) {
+      const tabs = ['file', 'manual', 'quick'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`input-btn-${t}`);
+        const content = document.getElementById(`input-content-${t}`);
+        if (t === tabName) {
+          btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all bg-blue-600 text-white shadow";
+          content.classList.remove('hidden');
+        } else {
+          btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-400 hover:text-white";
+          content.classList.add('hidden');
+        }
+      });
+    }
+
+    function toggleSplitModeUI() {
+      const mode = document.getElementById('split-mode').value;
+      const numContainer = document.getElementById('num-teams-container');
+      const sizeContainer = document.getElementById('team-size-container');
+      if (mode === 'num_teams') {
+        numContainer.classList.remove('hidden');
+        sizeContainer.classList.add('hidden');
+      } else {
+        numContainer.classList.add('hidden');
+        sizeContainer.classList.remove('hidden');
+      }
+    }
+
+    // ==========================================
+    // PARSING & PLAYER MANAGEMENT
+    // ==========================================
+    function parseLevelValue(valStr) {
+      if (!valStr) return 5.0;
+      const clean = valStr.toString().trim().toLowerCase();
+
+      const num = parseFloat(clean.replace(',', '.'));
+      if (!isNaN(num)) {
+        return Math.max(1, Math.min(10, num));
+      }
+
+      if (clean.includes('pro') || clean.includes('eccellente') || clean.includes('top')) return 9.5;
+      if (clean.includes('avanzat') || clean.includes('forte') || clean.includes('alto')) return 8.0;
+      if (clean.includes('intermedi') || clean.includes('medio')) return 5.5;
+      if (clean.includes('base') || clean.includes('principian') || clean.includes('scarso')) return 3.0;
+
+      return 5.0;
+    }
+
+    function parseInputText(text) {
+      const lines = text.split(/\r?\n/);
+      const newPlayers = [];
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+
+        let name = "";
+        let level = 5.0;
+
+        // Pattern matching for various delimiters (Comma, Dash, Tab, Space)
+        if (trimmed.includes(',')) {
+          const parts = trimmed.split(',');
+          name = parts[0].trim();
+          level = parseLevelValue(parts[1]);
+        } else if (trimmed.includes(' - ')) {
+          const parts = trimmed.split(' - ');
+          name = parts[0].trim();
+          level = parseLevelValue(parts[1]);
+        } else if (trimmed.includes('\t')) {
+          const parts = trimmed.split('\t');
+          name = parts[0].trim();
+          level = parseLevelValue(parts[1]);
+        } else {
+          const match = trimmed.match(/^(.*?)\s+([\d.,]+|[a-zA-Z]+|\([a-zA-Z\d.]+\))$/);
+          if (match) {
+            name = match[1].trim();
+            level = parseLevelValue(match[2].replace(/[()]/g, ''));
+          } else {
+            name = trimmed;
+            level = 5.0;
+          }
+        }
+
+        if (name) {
+          newPlayers.push({
+            id: Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+            name: name,
+            level: level,
+            selected: true
+          });
+        }
+      });
+
+      return newPlayers;
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const parsed = parseInputText(e.target.result);
+        if (parsed.length > 0) {
+          state.players = [...state.players, ...parsed];
+          saveStateToStorage();
+          renderPlayersList();
+          showToast(`Importati ${parsed.length} giocatori nel database!`, 'success');
+        } else {
+          showToast('Nessun giocatore estratto dal file.', 'warning');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function parseRawText() {
+      const val = document.getElementById('raw-text-input').value.trim();
+      if (!val) {
+        showToast('Inserisci testo da estrarre.', 'warning');
+        return;
+      }
+      const parsed = parseInputText(val);
+      if (parsed.length > 0) {
+        state.players = [...state.players, ...parsed];
+        saveStateToStorage();
+        renderPlayersList();
+        document.getElementById('raw-text-input').value = '';
+        showToast(`Salvati ${parsed.length} nuovi giocatori nel database!`, 'success');
+      }
+    }
+
+    function addSinglePlayer() {
+      const name = document.getElementById('quick-name').value.trim();
+      const level = parseFloat(document.getElementById('quick-level').value);
+
+      if (!name) {
+        showToast('Inserisci un nome valido!', 'warning');
+        return;
+      }
+
+      state.players.push({
+        id: Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        name: name,
+        level: Math.max(1, Math.min(10, level)),
+        selected: true
+      });
+
+      saveStateToStorage();
+      renderPlayersList();
+      document.getElementById('quick-name').value = '';
+      showToast(`Giocatore ${name} salvato nel DB!`, 'success');
+    }
+
+    function loadSampleData(notify = true) {
+      const sampleTxt = `Marco Bianchi, 9.0
+Luca Rossi, 8.5
+Andrea Verdi, 8.0
+Matteo Neri, 7.5
+Stefano Gialli, 7.0
+Davide Viola, 6.5
+Alessandro Conti, 6.0
+Giuseppe Esposito, 6.0
+Lorenzo Ricco, 5.5
+Francesco Ferrari, 5.0
+Gabriele Marino, 5.0
+Federico Bruno, 4.5
+Riccardo Greco, 4.0
+Tommaso Barbieri, 3.5`;
+
+      state.players = parseInputText(sampleTxt);
+      saveStateToStorage();
+      renderPlayersList();
+      if (notify) showToast('Dati di esempio caricati nel DB!', 'info');
+    }
+
+    function clearPlayerDatabase() {
+      if (state.players.length === 0) return;
+      state.players = [];
+      saveStateToStorage();
+      renderPlayersList();
+      showToast('Database giocatori svuotato.', 'info');
+    }
+
+    function renderPlayersList() {
+      const container = document.getElementById('players-list-container');
+      const searchVal = document.getElementById('player-search').value.toLowerCase();
+      const sortVal = document.getElementById('player-sort').value;
+
+      let filtered = state.players.filter(p => p.name.toLowerCase().includes(searchVal));
+
+      // Sorting
+      if (sortVal === 'name_asc') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortVal === 'level_desc') {
+        filtered.sort((a, b) => b.level - a.level);
+      } else if (sortVal === 'level_asc') {
+        filtered.sort((a, b) => a.level - b.level);
+      }
+
+      const selectedCount = state.players.filter(p => p.selected).length;
+      document.getElementById('selected-count').innerText = `${selectedCount} / ${state.players.length}`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs">
+            <i class="fa-solid fa-users-slash text-2xl mb-2 opacity-30"></i>
+            <p>Nessun giocatore presente nel DB.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => `
+        <div class="flex items-center justify-between bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-2 transition-all ${!p.selected ? 'opacity-40 grayscale' : ''}">
+          <div class="flex items-center space-x-3">
+            <input type="checkbox" ${p.selected ? 'checked' : ''} onchange="togglePlayerSelect('${p.id}')" class="w-4 h-4 accent-orange-500 rounded cursor-pointer">
+            <div>
+              <span class="text-xs font-semibold text-slate-200 block">${escapeHtml(p.name)}</span>
+              <span class="text-[10px] text-amber-400 font-mono font-bold">Liv: ${p.level.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="flex items-center space-x-1">
+            <button onclick="openEditModal('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button onclick="deletePlayer('${p.id}')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function togglePlayerSelect(id) {
+      const p = state.players.find(x => x.id === id);
+      if (p) {
+        p.selected = !p.selected;
+        saveStateToStorage();
+        renderPlayersList();
+      }
+    }
+
+    function toggleSelectAll(status) {
+      state.players.forEach(p => p.selected = status);
+      saveStateToStorage();
+      renderPlayersList();
+    }
+
+    function deletePlayer(id) {
+      state.players = state.players.filter(p => p.id !== id);
+      saveStateToStorage();
+      renderPlayersList();
+      showToast('Giocatore rimosso dal DB.', 'info');
+    }
+
+    // Modal Edit Handlers
+    function openEditModal(id) {
+      const p = state.players.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('edit-player-id').value = p.id;
+      document.getElementById('edit-player-name').value = p.name;
+      document.getElementById('edit-player-level-range').value = p.level;
+      document.getElementById('edit-player-level-num').value = p.level;
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function syncModalLevelInput(val) {
+      document.getElementById('edit-player-level-num').value = val;
+    }
+
+    function syncModalLevelRange(val) {
+      document.getElementById('edit-player-level-range').value = val;
+    }
+
+    function savePlayerEdit() {
+      const id = document.getElementById('edit-player-id').value;
+      const name = document.getElementById('edit-player-name').value.trim();
+      const level = parseFloat(document.getElementById('edit-player-level-num').value);
+
+      if (!name) return;
+
+      const p = state.players.find(x => x.id === id);
+      if (p) {
+        p.name = name;
+        p.level = Math.max(1, Math.min(10, level));
+        saveStateToStorage();
+        renderPlayersList();
+        closeEditModal();
+        showToast('Dati giocatore aggiornati nel DB.', 'success');
+      }
+    }
+
+    // ==========================================
+    // TEAM BALANCING ALGORITHM
+    // ==========================================
+    function generateTeams() {
+      const activePlayers = state.players.filter(p => p.selected);
+
+      if (activePlayers.length < 2) {
+        showToast('Seleziona almeno 2 giocatori attivi per creare le squadre!', 'error');
+        return;
+      }
+
+      const splitMode = document.getElementById('split-mode').value;
+      let numTeams = 2;
+
+      if (splitMode === 'num_teams') {
+        numTeams = parseInt(document.getElementById('num-teams-select').value);
+      } else {
+        const teamSize = parseInt(document.getElementById('team-size-select').value);
+        numTeams = Math.max(2, Math.floor(activePlayers.length / teamSize));
+      }
+
+      if (activePlayers.length < numTeams) {
+        showToast(`Giocatori insufficienti (${activePlayers.length}) per creare ${numTeams} squadre!`, 'error');
+        return;
+      }
+
+      const benchMode = document.getElementById('bench-mode').value;
+      const algo = document.getElementById('algo-select').value;
+
+      let pool = [...activePlayers].sort((a, b) => b.level - a.level);
+      let playingPool = pool;
+      let bench = [];
+
+      if (benchMode === 'bench' && splitMode === 'team_size') {
+        const teamSize = parseInt(document.getElementById('team-size-select').value);
+        const totalCapacity = numTeams * teamSize;
+        if (pool.length > totalCapacity) {
+          playingPool = pool.slice(0, totalCapacity);
+          bench = pool.slice(totalCapacity);
+        }
+      }
+
+      let teams = Array.from({ length: numTeams }, () => []);
+
+      if (algo === 'snake') {
+        let direction = 1;
+        let teamIdx = 0;
+        playingPool.forEach(player => {
+          teams[teamIdx].push(player);
+          if (direction === 1) {
+            if (teamIdx === numTeams - 1) direction = -1;
+            else teamIdx++;
+          } else {
+            if (teamIdx === 0) direction = 1;
+            else teamIdx--;
+          }
+        });
+      } else if (algo === 'greedy') {
+        playingPool.forEach(player => {
+          teams.sort((t1, t2) => {
+            const sum1 = t1.reduce((acc, p) => acc + p.level, 0);
+            const sum2 = t2.reduce((acc, p) => acc + p.level, 0);
+            return sum1 - sum2;
+          });
+          teams[0].push(player);
+        });
+      } else if (algo === 'random') {
+        const sorted = [...playingPool];
+        for (let i = 0; i < sorted.length; i += numTeams) {
+          const chunk = sorted.slice(i, i + numTeams).sort(() => Math.random() - 0.5);
+          chunk.forEach((player, idx) => {
+            if (teams[idx]) teams[idx].push(player);
+          });
+        }
+      }
+
+      currentGeneratedTeams = teams;
+      currentBench = bench;
+
+      renderGeneratedTeamsUI();
+      showToast('Squadre create e bilanciate!', 'success');
+    }
+
+    function renderGeneratedTeamsUI() {
+      const emptyState = document.getElementById('teams-empty-state');
+      const cardsContainer = document.getElementById('teams-cards-container');
+      const benchContainer = document.getElementById('bench-cards-container');
+      const exportActions = document.getElementById('export-actions');
+      const matchSummary = document.getElementById('match-summary');
+
+      if (currentGeneratedTeams.length === 0) {
+        emptyState.classList.remove('hidden');
+        cardsContainer.classList.add('hidden');
+        benchContainer.classList.add('hidden');
+        exportActions.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      cardsContainer.classList.remove('hidden');
+      exportActions.classList.remove('hidden');
+
+      const totalPlayers = currentGeneratedTeams.reduce((sum, t) => sum + t.length, 0);
+      const teamTotals = currentGeneratedTeams.map(t => t.reduce((sum, p) => sum + p.level, 0));
+      const delta = (Math.max(...teamTotals) - Math.min(...teamTotals)).toFixed(1);
+
+      matchSummary.innerHTML = `Membri in campo: <strong class="text-white">${totalPlayers}</strong> | Scarto d'equilibrio: <strong class="text-emerald-400">${delta} pt</strong>`;
+
+      cardsContainer.innerHTML = currentGeneratedTeams.map((team, idx) => {
+        const color = TEAM_COLORS[idx % TEAM_COLORS.length];
+        const totalSkill = team.reduce((sum, p) => sum + p.level, 0);
+        const avgSkill = team.length > 0 ? (totalSkill / team.length).toFixed(1) : "0.0";
+
+        return `
+          <div class="bg-slate-950 border ${color.border} rounded-xl overflow-hidden shadow-lg flex flex-col">
+            <div class="${color.header} px-4 py-2.5 border-b ${color.border} flex items-center justify-between">
+              <h3 class="font-bold text-white text-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-shield-halved ${color.text}"></i> ${color.name} ${idx + 1}
+              </h3>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${color.badge}">
+                TOT: ${totalSkill.toFixed(1)} pt
+              </span>
+            </div>
+            <div class="p-3 flex-grow space-y-1.5">
+              ${team.map(p => `
+                <div class="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                  <span class="text-xs text-slate-200 font-medium">${escapeHtml(p.name)}</span>
+                  <span class="text-[10px] font-mono text-amber-400 font-bold">${p.level.toFixed(1)}</span>
+                </div>
+              `).join('')}
+            </div>
+            <div class="px-3 py-2 bg-slate-900/40 border-t border-slate-900 text-[10px] text-slate-400 flex justify-between">
+              <span>Membri: <strong class="text-slate-200">${team.length}</strong></span>
+              <span>Media: <strong class="text-slate-200">${avgSkill}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (currentBench.length > 0) {
+        benchContainer.classList.remove('hidden');
+        document.getElementById('bench-count').innerText = currentBench.length;
+        document.getElementById('bench-list').innerHTML = currentBench.map(p => `
+          <div class="bg-slate-950 border border-amber-500/30 rounded-lg px-2.5 py-1 text-xs flex items-center gap-2">
+            <span class="text-slate-300">${escapeHtml(p.name)}</span>
+            <span class="text-[10px] font-mono text-amber-400">${p.level.toFixed(1)}</span>
+          </div>
+        `).join('');
+      } else {
+        benchContainer.classList.add('hidden');
+      }
+    }
+
+    // ==========================================
+    // MATCH HISTORY & SAVING
+    // ==========================================
+    function saveCurrentMatchToHistory() {
+      if (currentGeneratedTeams.length === 0) return;
+
+      const newMatch = {
+        id: "match_" + Date.now(),
+        date: new Date().toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' }),
+        teams: currentGeneratedTeams,
+        bench: currentBench
+      };
+
+      state.history.unshift(newMatch);
+      saveStateToStorage();
+      renderHistoryList();
+      showToast('Partita salvata nello storico locale!', 'success');
+    }
+
+    function renderHistoryList() {
+      const container = document.getElementById('history-list-container');
+      const badge = document.getElementById('history-count-badge');
+      badge.innerText = state.history.length;
+
+      if (state.history.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-500 text-xs">
+            <i class="fa-solid fa-folder-open text-3xl mb-2 opacity-30"></i>
+            <p>Nessuna sessione di partita salvata finora nello storico.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = state.history.map(match => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-orange-400 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-day"></i> Sessione del ${match.date}
+            </span>
+            <button onclick="deleteMatchFromHistory('${match.id}')" class="text-xs text-red-400 hover:text-red-300">
+              <i class="fa-solid fa-trash"></i> Elimina
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            ${match.teams.map((t, idx) => `
+              <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-xs">
+                <p class="font-bold text-slate-300 mb-1">Squadra ${idx + 1} (${t.length} giog.)</p>
+                <ul class="space-y-0.5 text-[11px] text-slate-400">
+                  ${t.map(p => `<li>• ${escapeHtml(p.name)}</li>`).join('')}
+                </ul>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function deleteMatchFromHistory(id) {
+      state.history = state.history.filter(h => h.id !== id);
+      saveStateToStorage();
+      renderHistoryList();
+      showToast('Sessione eliminata dallo storico.', 'info');
+    }
+
+    function clearMatchHistory() {
+      if (state.history.length === 0) return;
+      state.history = [];
+      saveStateToStorage();
+      renderHistoryList();
+      showToast('Storico partite completamente svuotato.', 'info');
+    }
+
+    // ==========================================
+    // BACKUP & RESTORE (JSON DB EXPORT/IMPORT)
+    // ==========================================
+    function exportDatabaseJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `VolleyBalancer_DB_Backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('File JSON di backup scaricato!', 'success');
+    }
+
+    function importDatabaseJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const merge = document.getElementById('import-merge-option').checked;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (importedData.players && Array.isArray(importedData.players)) {
+            if (merge) {
+              // Merge avoiding duplicate IDs
+              const existingIds = new Set(state.players.map(p => p.id));
+              importedData.players.forEach(p => {
+                if (!existingIds.has(p.id)) state.players.push(p);
+              });
+              if (importedData.history) {
+                const existingHistIds = new Set(state.history.map(h => h.id));
+                importedData.history.forEach(h => {
+                  if (!existingHistIds.has(h.id)) state.history.push(h);
+                });
+              }
+            } else {
+              // Full Replace
+              state.players = importedData.players;
+              state.history = importedData.history || [];
+            }
+
+            saveStateToStorage();
+            renderPlayersList();
+            renderHistoryList();
+            showToast('Database ripristinato ed aggiornato con successo!', 'success');
+          } else {
+            showToast('Formato file JSON non valido.', 'error');
+          }
+        } catch (err) {
+          showToast('Errore durante la lettura del file JSON.', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // ==========================================
+    // CLIPBOARD & EXPORT PDF
+    // ==========================================
+    function copyTeamsToClipboard() {
+      if (currentGeneratedTeams.length === 0) return;
+
+      let text = "🏐 *COMPOSIZIONE SQUADRE PALLAVOLO* 🏐\n\n";
+      currentGeneratedTeams.forEach((team, idx) => {
+        const totalSkill = team.reduce((sum, p) => sum + p.level, 0).toFixed(1);
+        text += `*SQUADRA ${idx + 1}* (Tot. ${totalSkill} pt):\n`;
+        team.forEach(p => {
+          text += `  • ${p.name} (${p.level.toFixed(1)})\n`;
+        });
+        text += "\n";
+      });
+
+      if (currentBench.length > 0) {
+        text += "*PANCHINA / RISERVE*:\n";
+        currentBench.forEach(p => { text += `  • ${p.name}\n`; });
+      }
+
+      const tempTextArea = document.createElement("textarea");
+      tempTextArea.value = text;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Formazioni copiate negli appunti!', 'success');
+      } catch (err) {
+        showToast('Errore durante la copia.', 'error');
+      }
+      document.body.removeChild(tempTextArea);
+    }
+
+    function exportToPDF() {
+      const element = document.getElementById('output-wrapper');
+      if (!element || currentGeneratedTeams.length === 0) return;
+
+      showToast('Esportazione PDF in corso...', 'info');
+
+      const opt = {
+        margin:       0.5,
+        filename:     'Squadre_Pallavolo_VolleyBalancer.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, backgroundColor: '#090d16' },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    }
+
+    // ==========================================
+    // UTILS & TOAST SYSTEM
+    // ==========================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+
+      let icon = 'fa-circle-info text-blue-400';
+      let border = 'border-blue-500';
+
+      if (type === 'success') {
+        icon = 'fa-circle-check text-emerald-400';
+        border = 'border-emerald-500';
+      } else if (type === 'warning') {
+        icon = 'fa-triangle-exclamation text-yellow-400';
+        border = 'border-yellow-500';
+      } else if (type === 'error') {
+        icon = 'fa-circle-xmark text-red-400';
+        border = 'border-red-500';
+      }
+
+      toast.className = `pointer-events-auto flex items-center space-x-3 bg-slate-900 border-l-4 ${border} text-slate-100 px-4 py-3 rounded-lg shadow-2xl text-xs transition-all duration-300 opacity-0 transform translate-y-2`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => { toast.classList.remove('opacity-0', 'translate-y-2'); }, 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
